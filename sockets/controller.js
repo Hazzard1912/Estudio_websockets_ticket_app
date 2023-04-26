@@ -1,9 +1,44 @@
-const socketController = (socket) => {
-  socket.on("enviar-mensaje", (payload, callback) => {
-    const id = 123456789;
-    callback(id);
+const TicketControl = require("../models/ticket-control");
 
-    socket.broadcast.emit("enviar-mensaje", payload);
+const ticketControl = new TicketControl();
+
+const socketController = (socket) => {
+  socket.emit("ultimo-ticket", ticketControl.ultimo);
+  socket.emit("estado-actual", ticketControl.ultimos4);
+  socket.emit("tickets-pendientes", ticketControl.tickets.length);
+
+  socket.on("siguiente-ticket", (payload, callback) => {
+    const siguiente = ticketControl.siguiente();
+    socket.broadcast.emit('tickets-pendientes', ticketControl.tickets.length);
+    callback(siguiente);
+  });
+
+  socket.on("atender-ticket", (payload, callback) => {
+    if (!payload.escritorio) {
+      return callback({
+        ok: false,
+        msg: "El escritorio es obligatorio",
+      });
+    }
+
+    // Cual es el ticket que tengo que atender
+    const ticket = ticketControl.atenderTicket(payload.escritorio);
+
+    socket.broadcast.emit('estado-actual', ticketControl.ultimos4);
+    socket.emit('tickets-pendientes', ticketControl.tickets.length);
+    socket.broadcast.emit('tickets-pendientes', ticketControl.tickets.length);
+
+    if (!ticket) {
+      callback({
+        ok: false,
+        msg: "No hay tickets pendientes",
+      });
+    } else {
+      callback({
+        ok: true,
+        ticket,
+      });
+    }
   });
 };
 
